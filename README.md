@@ -1,3 +1,4 @@
+```
 cheaptest/
 ├── cli/                    # TypeScript CLI
 │   ├── src/
@@ -39,3 +40,4 @@ cheaptest/
 │
 └── benchmarks/
 └── cost-analysis.md   # Real performance data
+```
