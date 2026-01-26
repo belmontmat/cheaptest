@@ -1,1 +1,0 @@
-{"version":3,"file":"cost.d.ts","sourceRoot":"","sources":["../../src/commands/cost.ts"],"names":[],"mappings":"AAEA,UAAU,WAAW;IACnB,OAAO,CAAC,EAAE,OAAO,CAAC;IAClB,SAAS,CAAC,EAAE,OAAO,CAAC;IACpB,UAAU,CAAC,EAAE,OAAO,CAAC;IACrB,SAAS,CAAC,EAAE,OAAO,CAAC;CACrB;AAED,wBAAsB,WAAW,CAAC,OAAO,EAAE,WAAW,GAAG,OAAO,CAAC,IAAI,CAAC,CAOrE"}
