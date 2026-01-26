@@ -1,0 +1,21 @@
+version: 1
+aws:
+  region: us-east-1
+  cluster: cheaptest-cluster
+  taskDefinition: cheaptest-runner
+  subnets: []
+  securityGroups: []
+tests:
+  directory: ./e2e
+  pattern: "**/*.spec.ts"
+  framework: playwright
+execution:
+  cpu: 1024
+  memory: 2048
+  timeout: 30
+storage:
+  bucket: cheaptest-storage
+  retentionDays: 30
+output:
+  format: pretty
+  verbose: false

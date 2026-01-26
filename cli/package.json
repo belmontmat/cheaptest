@@ -1,0 +1,56 @@
+{
+  "name": "cheaptest",
+  "version": "0.1.0",
+  "description": "Cost-effective parallel e2e test runner",
+  "main": "dist/index.js",
+  "bin": {
+    "cheaptest": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "watch": "tsc --watch",
+    "lint": "eslint src --ext .ts",
+    "test": "jest"
+  },
+  "keywords": [
+    "testing",
+    "e2e",
+    "parallel",
+    "ci-cd",
+    "aws"
+  ],
+  "author": "Mathew Belmont",
+  "license": "MIT",
+  "dependencies": {
+    "@aws-sdk/client-cloudwatch-logs": "^3.490.0",
+    "@aws-sdk/client-ecs": "^3.490.0",
+    "@aws-sdk/client-s3": "^3.490.0",
+    "@aws-sdk/lib-storage": "^3.490.0",
+    "@kubernetes/client-node": "^1.4.0",
+    "chalk": "^4.1.2",
+    "commander": "^11.1.0",
+    "dotenv": "^16.3.1",
+    "glob": "^10.3.10",
+    "ora": "^5.4.1",
+    "table": "^6.8.1",
+    "tar": "^7.5.6",
+    "uuid": "^9.0.1",
+    "yaml": "^2.3.4"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.11",
+    "@types/node": "^20.10.6",
+    "@types/tar": "^6.1.10",
+    "@types/uuid": "^9.0.7",
+    "@typescript-eslint/eslint-plugin": "^6.17.0",
+    "@typescript-eslint/parser": "^6.17.0",
+    "eslint": "^8.56.0",
+    "jest": "^29.7.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
