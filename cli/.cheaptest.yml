@@ -6,7 +6,7 @@ aws:
   subnets: []
   securityGroups: []
 tests:
-  directory: ./e2e
+  directory: ./examples/playwright
   pattern: "**/*.spec.ts"
   framework: playwright
 execution:

@@ -1,0 +1,13 @@
+{
+  "name": "cheaptest-playwright-examples",
+  "version": "1.0.0",
+  "description": "Example Playwright tests for cheaptest",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0"
+  }
+}

@@ -1,6 +1,7 @@
 export type BackendType = 'ecs' | 'kubernetes';
 export type OutputFormat = 'pretty' | 'json' | 'junit';
 export type TestFramework = 'playwright' | 'cypress' | 'selenium';
+import { TestFile } from '../core/test-parser';
 
 export interface CheaptestConfig {
   version: number;
@@ -28,6 +29,7 @@ export interface CheaptestConfig {
   output: {
     format: OutputFormat;
     verbose: boolean;
+    showCostComparison?: boolean;
   };
   kubernetes?: {
     context?: string;
@@ -44,6 +46,7 @@ export interface RunOptions {
   dryRun?: boolean;
   timeout?: number;
   retries?: number;
+  testFiles?: TestFile[];
 }
 
 export interface TestShard {

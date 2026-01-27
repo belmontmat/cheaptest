@@ -1,0 +1,13 @@
+{
+  "name": "cheaptest-cypress-examples",
+  "version": "1.0.0",
+  "description": "Example Cypress tests for cheaptest",
+  "scripts": {
+    "test": "cypress run",
+    "test:open": "cypress open"
+  },
+  "devDependencies": {
+    "cypress": "^13.6.0",
+    "typescript": "^5.3.0"
+  }
+}
