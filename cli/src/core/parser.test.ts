@@ -280,24 +280,51 @@ describe('TestParser', () => {
       expect(result.files[2].relativePath).toBe('zebra.spec.ts');
     });
 
-    it('should handle different test frameworks', async () => {
+    it('should handle playwright framework', async () => {
       await fs.writeFile(
-        path.join(tempDir, 'test.spec.ts'),
-        'test("example", () => {})'
-      ); // TODO: Fails
+      path.join(tempDir, 'test.spec.ts'),
+      'test("example", () => {})'
+    );
 
-      const frameworks: TestFramework[] = ['playwright', 'cypress', 'selenium'];
-
-      for (const framework of frameworks) {
-        const result = await parser.discover({
-          directory: tempDir,
-          pattern: '**/*.spec.ts',
-          framework,
-        });
-
-        expect(result.files[0].framework).toBe(framework);
-      }
+    const result = await parser.discover({
+      directory: tempDir,
+      pattern: '**/*.spec.ts',
+      framework: 'playwright',
     });
+
+    expect(result.files[0].framework).toBe('playwright');
+  });
+
+  it('should handle cypress framework', async () => {
+    await fs.writeFile(
+      path.join(tempDir, 'test.spec.ts'),
+      'test("example", () => {})'
+    );
+
+    const result = await parser.discover({
+      directory: tempDir,
+      pattern: '**/*.spec.ts',
+      framework: 'cypress',
+    });
+
+    expect(result.files[0].framework).toBe('cypress');
+  });
+
+  it('should handle selenium framework', async () => {
+    await fs.writeFile(
+      path.join(tempDir, 'test.spec.ts'),
+      'test("example", () => {})'
+    );
+
+    const result = await parser.discover({
+      directory: tempDir,
+      pattern: '**/*.spec.ts',
+      framework: 'selenium',
+    });
+
+    expect(result.files[0].framework).toBe('selenium');
+  });
+  
   });
 
   describe('estimateDuration', () => {
@@ -743,7 +770,9 @@ describe('TestParser', () => {
 
 describe('TestParser with example files', () => {
   let parser: TestParser;
-  const projectRoot = path.join(__dirname, '../..');
+  
+  // Assume tests are run from cli/ directory
+  const projectRoot = path.join(process.cwd(), '..');
   const examplesDir = path.join(projectRoot, 'examples');
 
   beforeEach(() => {

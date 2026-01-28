@@ -160,18 +160,17 @@ export class TestParser {
    * Build glob pattern based on custom pattern or framework defaults
    */
   private buildPattern(pattern: string, framework: TestFramework): string {
-    // If custom pattern provided, use it
-    if (pattern && pattern !== '**/*.spec.ts') {
-      return pattern;
-    }
-
-    // Otherwise use framework defaults
-    const patterns = this.frameworkPatterns[framework];
-    
-    // For glob, we use the first pattern as primary
-    // (in practice, glob supports array but we'll keep it simple)
-    return patterns[0];
+  // If pattern is explicitly provided, always use it
+  if (pattern) {
+    return pattern;
   }
+
+  // Otherwise use framework defaults
+  const patterns = this.frameworkPatterns[framework];
+  
+  // For glob, we use the first pattern as primary
+  return patterns[0];
+}
 
   /**
    * Validate that directory exists and is readable
