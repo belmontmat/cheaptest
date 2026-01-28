@@ -1,5 +1,6 @@
 import path from 'path';
 import chalk from 'chalk';
+import { createShards } from '../core/sharding';
 import { RunOptions, CheaptestConfig } from '../types';
 import { Logger } from '../utils/logger';
 import { loadConfig, validateConfig, findConfigFile } from '../utils/config';
@@ -190,14 +191,36 @@ export async function runCommand(options: RunOptions): Promise<void> {
     logger.info('');
     
     const startTime = Date.now();
-    
+
+    // ============================================
+    // CREATE SHARDS
+    // ============================================
+    logger.info('');
+    logger.startSpinner(`Creating ${options.parallel} test shards...`);
+
+    const shards = createShards(
+      discovery.files,
+      options.parallel,
+      'duration-based' // Use duration-based for best balance
+    );
+
+    logger.succeedSpinner('Shards created');
+
+    if (options.verbose) {
+      const { TestSharding } = await import('../core/sharding');
+      const sharding = new TestSharding();
+      const visualization = sharding.visualizeShards(shards);
+      logger.debug(visualization);
+    }
+
+    // Pass shards to backend
     let result;
     try {
       result = await backend.run(
         {
           ...options,
-          // Pass the discovered test files to the backend
           testFiles: discovery.files,
+          shards,
         },
         config
       );

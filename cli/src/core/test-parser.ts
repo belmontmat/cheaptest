@@ -1,16 +1,7 @@
 import { glob } from 'glob';
 import fs from 'fs/promises';
 import path from 'path';
-import { TestFramework } from '../types';
-
-export interface TestFile {
-  path: string;
-  relativePath: string;
-  framework: TestFramework;
-  size: number;
-  estimatedDuration?: number;
-  suite?: string;
-}
+import { TestFile, TestFramework } from '../types';
 
 export interface TestDiscoveryOptions {
   directory: string;
