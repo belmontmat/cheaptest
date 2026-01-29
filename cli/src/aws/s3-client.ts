@@ -11,12 +11,12 @@ import fs from 'fs/promises';
 import { createReadStream, ReadStream } from 'fs';
 import { Readable } from 'stream';
 import path from 'path';
-import tar from 'tar';
+import * as tar from 'tar';
 
 export interface S3UploadOptions {
   bucket: string;
   key: string;
-  body: string | Buffer | Readable; // ← Changed from NodeJS.ReadableStream to Readable
+  body: string | Buffer | Readable;
   contentType?: string;
   metadata?: Record<string, string>;
 }
@@ -209,6 +209,9 @@ export class S3ClientWrapper {
         },
         [path.basename(directory)]
       );
+
+      // Verify tarball was created (defensive check for file system sync)
+      await fs.access(tarballPath);
 
       // Upload tarball
       const stream = createReadStream(tarballPath);

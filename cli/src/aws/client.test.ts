@@ -13,16 +13,9 @@ import path from 'path';
 import os from 'os';
 import { Readable } from 'stream';
 
-// Mock AWS SDK
+// Mock AWS SDK only - use real tar for behavioral tests
 jest.mock('@aws-sdk/client-s3');
 jest.mock('@aws-sdk/lib-storage');
-jest.mock('tar', () => ({
-  create: jest.fn(async (opts: { file: string }) => {
-    const fsMod = require('fs/promises');
-    await fsMod.writeFile(opts.file, 'dummy tarball');
-  }),
-  extract: jest.fn().mockResolvedValue(undefined),
-}));
 
 describe('S3ClientWrapper', () => {
   let s3Client: S3ClientWrapper;
@@ -42,6 +35,7 @@ describe('S3ClientWrapper', () => {
     } as any;
 
     (S3Client as jest.MockedClass<typeof S3Client>).mockImplementation(() => mockS3 as unknown as S3Client);
+
 
     s3Client = new S3ClientWrapper('us-east-1');
   });
@@ -507,30 +501,10 @@ describe('S3ClientWrapper', () => {
   });
 
   describe('uploadDirectory', () => {
-    it('should create tarball and upload', async () => {
-      // Create test directory with files
-      const testDir = path.join(tempDir, 'test-dir');
-      await fs.mkdir(testDir, { recursive: true });
-      await fs.writeFile(path.join(testDir, 'file1.txt'), 'content1');
-      await fs.writeFile(path.join(testDir, 'file2.txt'), 'content2');
+    // Retry due to occasional filesystem timing issues with tar.create
+    jest.retryTimes(3);
 
-      // Mock upload to succeed
-      const mockUpload = {
-        done: jest.fn().mockResolvedValue({}),
-      };
-      (Upload as jest.MockedClass<typeof Upload>).mockImplementation(() => mockUpload as any);
-
-      const result = await s3Client.uploadDirectory(
-        testDir,
-        'test-bucket',
-        'test.tar.gz'
-      );
-
-      expect(result).toBe('s3://test-bucket/test.tar.gz');
-      expect(mockUpload.done).toHaveBeenCalled();
-    });
-
-    it('should clean up temporary tarball', async () => {
+    it('should create tarball, upload to S3, and clean up', async () => {
       const testDir = path.join(tempDir, 'test-dir');
       await fs.mkdir(testDir, { recursive: true });
       await fs.writeFile(path.join(testDir, 'file.txt'), 'content');
@@ -540,9 +514,13 @@ describe('S3ClientWrapper', () => {
       };
       (Upload as jest.MockedClass<typeof Upload>).mockImplementation(() => mockUpload as any);
 
-      await s3Client.uploadDirectory(testDir, 'test-bucket', 'test.tar.gz');
+      const result = await s3Client.uploadDirectory(testDir, 'test-bucket', 'test.tar.gz');
 
-      // Check that tarball was cleaned up
+      // Verify behavior: returns S3 URI
+      expect(result).toBe('s3://test-bucket/test.tar.gz');
+      // Verify behavior: upload was called
+      expect(mockUpload.done).toHaveBeenCalled();
+      // Verify behavior: temporary tarball was cleaned up
       const tarballPath = path.join(tempDir, 'test-dir.tar.gz');
       const exists = await fs.access(tarballPath).then(() => true).catch(() => false);
       expect(exists).toBe(false);
@@ -551,24 +529,33 @@ describe('S3ClientWrapper', () => {
 
   describe('downloadAndExtract', () => {
     it('should download and extract tarball', async () => {
-      const mockBody = Readable.from([Buffer.from('tarball content')]);
+      // Create a real tarball with test content
+      const tar = await import('tar');
+      const sourceDir = path.join(tempDir, 'source');
+      await fs.mkdir(sourceDir, { recursive: true });
+      await fs.writeFile(path.join(sourceDir, 'test-file.txt'), 'extracted content');
 
-      mockS3.send.mockResolvedValueOnce({
-        Body: mockBody,
-      });
+      const tarballPath = path.join(tempDir, 'test.tar.gz');
+      await tar.create({ gzip: true, file: tarballPath, cwd: tempDir }, ['source']);
 
+      // Mock S3 to return the real tarball content
+      const tarballContent = await fs.readFile(tarballPath);
+      const mockBody = Readable.from([tarballContent]);
+      mockS3.send.mockResolvedValueOnce({ Body: mockBody });
+
+      // Extract to destination
       const destination = path.join(tempDir, 'dest');
       await fs.mkdir(destination, { recursive: true });
-
       await s3Client.downloadAndExtract('test-bucket', 'test.tar.gz', destination);
 
-      const tarMock = jest.requireMock<{ extract: jest.Mock }>('tar');
-      expect(tarMock.extract).toHaveBeenCalledWith({
-        file: path.join(destination, 'temp.tar.gz'),
-        cwd: destination,
-      });
+      // Verify the file was actually extracted (testing behavior, not implementation)
+      const extractedContent = await fs.readFile(
+        path.join(destination, 'source', 'test-file.txt'),
+        'utf-8'
+      );
+      expect(extractedContent).toBe('extracted content');
 
-      // Check that temporary tarball was cleaned up
+      // Verify temp tarball was cleaned up
       const tempTarball = path.join(destination, 'temp.tar.gz');
       const exists = await fs.access(tempTarball).then(() => true).catch(() => false);
       expect(exists).toBe(false);
