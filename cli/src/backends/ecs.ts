@@ -65,8 +65,16 @@ export class ECSBackend implements BackendInterface {
       // Step 4: Wait for tasks to complete
       await this.waitForCompletion(taskArns, runId, config);
 
-      // Step 5: Aggregate results
+      // Step 5: Aggregate results (even if some tasks had test failures)
       const results = await this.aggregateResults(runId, options.shards!.length, config);
+
+      // Check if we got all results
+      if (results.length < options.shards!.length) {
+        throw new Error(
+          `Failed to collect all shard results: got ${results.length}/${options.shards!.length}. ` +
+          `Check S3 bucket for missing shard-*.json files.`
+        );
+      }
 
       const endTime = new Date();
       const duration = endTime.getTime() - startTime.getTime();
@@ -206,7 +214,7 @@ export class ECSBackend implements BackendInterface {
                     { name: 'S3_BUCKET', value: config.storage.bucket },
                     { name: 'AWS_REGION', value: config.aws.region },
                     { name: 'TEST_FRAMEWORK', value: config.tests.framework },
-                    { name: 'TEST_TIMEOUT', value: config.execution.timeout.toString() },
+                    { name: 'TEST_TIMEOUT', value: (config.execution.timeout * 60 * 1000).toString() },
                   ],
                 },
               ],
@@ -247,12 +255,13 @@ export class ECSBackend implements BackendInterface {
     taskArns: string[],
     runId: string,
     config: CheaptestConfig
-  ): Promise<void> {
+  ): Promise<{ failedTasks: Task[] }> {
     this.logger.info('');
     this.logger.startSpinner('Waiting for tasks to complete...');
 
     const startTime = Date.now();
-    const timeout = config.execution.timeout * 1.5;
+    // Convert timeout from minutes to milliseconds, with 1.5x buffer
+    const timeout = config.execution.timeout * 60 * 1000 * 1.5;
 
     while (true) {
       const elapsed = Date.now() - startTime;
@@ -283,31 +292,32 @@ export class ECSBackend implements BackendInterface {
       }
 
       if (stopped === taskArns.length) {
-        const failed = tasks.filter(t => {
+        const failedTasks = tasks.filter(t => {
           const exitCode = t.containers?.[0]?.exitCode;
           return exitCode !== undefined && exitCode !== 0;
         });
 
-        if (failed.length > 0) {
-          this.logger.failSpinner(`${failed.length} tasks failed`);
+        if (failedTasks.length > 0) {
+          // Log failures but don't throw - allow aggregation to collect results first
+          this.logger.stopSpinner();
+          this.logger.warn(`${taskArns.length} tasks completed (${failedTasks.length} with test failures)`);
 
           if (config.output.verbose) {
-            failed.forEach(task => {
+            failedTasks.forEach(task => {
               const container = task.containers?.[0];
-              this.logger.error(
+              this.logger.warn(
                 `  Task ${task.taskArn?.split('/').pop()} exited with code ${container?.exitCode}`
               );
               if (container?.reason) {
-                this.logger.error(`  Reason: ${container.reason}`);
+                this.logger.warn(`  Reason: ${container.reason}`);
               }
             });
           }
-
-          throw new Error(`${failed.length} tasks failed`);
+        } else {
+          this.logger.succeedSpinner(`All ${taskArns.length} tasks completed successfully`);
         }
 
-        this.logger.succeedSpinner(`All ${taskArns.length} tasks completed successfully`);
-        break;
+        return { failedTasks };
       }
 
       await new Promise(resolve => setTimeout(resolve, 5000));
@@ -322,28 +332,59 @@ export class ECSBackend implements BackendInterface {
     this.logger.info('');
     this.logger.startSpinner('Aggregating results from S3...');
 
+    // Wait briefly for S3 eventual consistency after tasks stop
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    const maxRetries = 5;
+    const baseDelayMs = 1000;
+
     try {
       const results: TestResult[] = [];
+      const failedShards: number[] = [];
 
       for (let i = 0; i < shardCount; i++) {
         const resultKey = `runs/${runId}/results/shard-${i}.json`;
+        let result: TestResult | null = null;
 
-        try {
-          const result = await this.s3Client.downloadJSON<TestResult>(
-            config.storage.bucket,
-            resultKey
-          );
-
-          results.push(result);
-        } catch (error: any) {
-          this.logger.warn(`  Warning: Could not download results for shard ${i}`);
-          if (config.output.verbose) {
-            this.logger.debug(`  Error: ${error.message}`);
+        // Retry with exponential backoff
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+          try {
+            result = await this.s3Client.downloadJSON<TestResult>(
+              config.storage.bucket,
+              resultKey
+            );
+            break; // Success, exit retry loop
+          } catch (error: any) {
+            if (attempt < maxRetries - 1) {
+              const delay = baseDelayMs * Math.pow(2, attempt);
+              if (config.output.verbose) {
+                this.logger.debug(`  Shard ${i} not ready, retrying in ${delay}ms...`);
+              }
+              await new Promise(resolve => setTimeout(resolve, delay));
+            } else {
+              this.logger.warn(`  Failed to download results for shard ${i} after ${maxRetries} attempts`);
+              if (config.output.verbose) {
+                this.logger.debug(`  Error: ${error.message}`);
+              }
+              failedShards.push(i);
+            }
           }
         }
+
+        if (result) {
+          results.push(result);
+        }
+
+        this.logger.updateSpinner(`Aggregating results from S3... (${results.length}/${shardCount})`);
       }
 
-      this.logger.succeedSpinner(`Aggregated results from ${results.length}/${shardCount} shards`);
+      if (failedShards.length > 0) {
+        this.logger.stopSpinner();
+        this.logger.warn(`Could not retrieve results for shards: ${failedShards.join(', ')}`);
+      } else {
+        this.logger.succeedSpinner(`Aggregated results from ${results.length}/${shardCount} shards`);
+      }
+
       return results;
     } catch (error: any) {
       this.logger.failSpinner(`Failed to aggregate results: ${error.message}`);

@@ -229,12 +229,16 @@ export class S3ClientWrapper {
         `${path.basename(directory)}.tar.gz`
       );
 
-      // Create tar.gz
+      // Create tar.gz, excluding node_modules to avoid version conflicts
       await tar.create(
         {
           gzip: true,
           file: tarballPath,
           cwd: path.dirname(directory),
+          filter: (filePath: string) => {
+            // Exclude node_modules directories
+            return !filePath.includes('node_modules');
+          },
         },
         [path.basename(directory)]
       );

@@ -18,13 +18,16 @@ export class PlaywrightRunner {
     const fileListPath = path.join(this.config.workspace, '.shard-files.txt');
     await fs.writeFile(fileListPath, testFiles.join('\n'));
 
-    // Create Playwright config for this shard
-    const playwrightConfig = await this.createPlaywrightConfig(testFiles);
-    const configPath = path.join(this.config.workspace, 'playwright.shard.config.ts');
+    // Create Playwright config for this shard (use .js to avoid TypeScript compilation)
+    const playwrightConfig = this.createPlaywrightConfig(testFiles);
+    const configPath = path.join(this.config.workspace, 'playwright.shard.config.js');
     await fs.writeFile(configPath, playwrightConfig);
 
     // Run Playwright with JSON reporter
     const resultsPath = path.join(this.config.workspace, 'playwright-results.json');
+
+    // Use the installed Playwright from /app/node_modules instead of npx
+    const playwrightBin = '/app/node_modules/.bin/playwright';
 
     return new Promise((resolve, reject) => {
       const args = [
@@ -34,13 +37,15 @@ export class PlaywrightRunner {
         ...testFiles,
       ];
 
-      console.log(`  Command: npx playwright ${args.join(' ')}`);
+      console.log(`  Command: ${playwrightBin} ${args.join(' ')}`);
 
-      const proc = spawn('npx', ['playwright', ...args], {
+      const proc = spawn(playwrightBin, args, {
         cwd: this.config.workspace,
         env: {
           ...process.env,
           PLAYWRIGHT_JSON_OUTPUT_NAME: resultsPath,
+          // Ensure node can find modules in /app
+          NODE_PATH: '/app/node_modules',
         },
         stdio: ['ignore', 'pipe', 'pipe'],
       });
@@ -87,11 +92,10 @@ export class PlaywrightRunner {
     });
   }
 
-  private async createPlaywrightConfig(testFiles: string[]): Promise<string> {
+  private createPlaywrightConfig(testFiles: string[]): string {
+    // Use CommonJS module.exports to avoid needing @playwright/test import in workspace
     return `
-import { defineConfig } from '@playwright/test';
-
-export default defineConfig({
+module.exports = {
   testDir: '.',
   timeout: ${this.config.timeout},
   fullyParallel: true,
@@ -104,7 +108,7 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },
-});
+};
 `;
   }
 

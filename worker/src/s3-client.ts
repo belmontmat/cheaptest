@@ -5,7 +5,7 @@ import {
 } from '@aws-sdk/client-s3';
 import fs from 'fs/promises';
 import path from 'path';
-import tar from 'tar';
+import * as tar from 'tar';
 import { Readable } from 'stream';
 
 export class S3ClientWrapper {

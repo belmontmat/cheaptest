@@ -75,32 +75,58 @@ async function main() {
       shard,
     });
 
-    const result = await runner.run();
+    let result;
+    let runnerError: Error | null = null;
+
+    try {
+      result = await runner.run();
+    } catch (error: any) {
+      // Capture error but continue to upload partial results
+      runnerError = error;
+      console.error('❌ Test runner error:', error.message);
+
+      // Create error result so we still upload something
+      result = {
+        shard: config.shardId,
+        passed: 0,
+        failed: shard.files.length,
+        skipped: 0,
+        duration: 0,
+        tests: shard.files.map((f: any) => ({
+          name: f.relativePath,
+          file: f.relativePath,
+          status: 'failed' as const,
+          duration: 0,
+          error: `Test runner crashed: ${error.message}`,
+        })),
+      };
+    }
 
     console.log('-'.repeat(60));
-    console.log('✓ Tests completed');
+    console.log(runnerError ? '⚠ Tests completed with errors' : '✓ Tests completed');
     console.log(`  Passed: ${result.passed}`);
     console.log(`  Failed: ${result.failed}`);
     console.log(`  Skipped: ${result.skipped}`);
     console.log(`  Duration: ${(result.duration / 1000).toFixed(2)}s`);
     console.log('');
 
-    // Upload results to S3
+    // Upload results to S3 (even on failure)
     console.log('📤 Uploading results...');
     const resultsKey = `runs/${config.runId}/results/shard-${config.shardId}.json`;
-    
+
     await s3Client.uploadJSON(config.bucket, resultsKey, result, {
       runId: config.runId,
       shardId: config.shardId.toString(),
       framework: config.framework,
       timestamp: new Date().toISOString(),
+      ...(runnerError && { error: runnerError.message }),
     });
 
     console.log(`✓ Results uploaded to ${resultsKey}`);
     console.log('');
 
     // Exit with appropriate code
-    const exitCode = result.failed > 0 ? 1 : 0;
+    const exitCode = result.failed > 0 || runnerError ? 1 : 0;
     
     console.log('='.repeat(60));
     console.log(`Worker completed with exit code ${exitCode}`);

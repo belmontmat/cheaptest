@@ -18,7 +18,7 @@ tests:
 execution:
   cpu: 1024
   memory: 2048
-  timeout: 300000
+  timeout: 5  # minutes
 
 storage:
   bucket: cheaptest-dev-storage-200180699902
