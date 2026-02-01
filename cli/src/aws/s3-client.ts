@@ -5,6 +5,8 @@ import {
   DeleteObjectCommand,
   ListObjectsV2Command,
   HeadObjectCommand,
+  HeadBucketCommand,
+  CreateBucketCommand,
 } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import fs from 'fs/promises';
@@ -40,9 +42,36 @@ export interface S3ListOptions {
 
 export class S3ClientWrapper {
   private client: S3Client;
+  private region: string;
 
   constructor(region: string) {
+    this.region = region;
     this.client = new S3Client({ region });
+  }
+
+  /**
+   * Check if bucket exists, create it if not
+   */
+  async ensureBucketExists(bucket: string): Promise<void> {
+    try {
+      await this.client.send(new HeadBucketCommand({ Bucket: bucket }));
+    } catch (err: any) {
+      if (err.name === 'NotFound' || err.$metadata?.httpStatusCode === 404) {
+        // Bucket doesn't exist, create it
+        const createParams: any = { Bucket: bucket };
+
+        // LocationConstraint is required for all regions except us-east-1
+        if (this.region !== 'us-east-1') {
+          createParams.CreateBucketConfiguration = {
+            LocationConstraint: this.region,
+          };
+        }
+
+        await this.client.send(new CreateBucketCommand(createParams));
+      } else {
+        throw new Error(`Failed to check bucket: ${err.message}`);
+      }
+    }
   }
 
   /**

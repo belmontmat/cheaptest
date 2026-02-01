@@ -214,6 +214,15 @@ export async function runCommand(options: RunOptions): Promise<void> {
     }
 
     // Pass shards to backend
+    // Override config.tests.directory with CLI --tests argument if provided
+    const effectiveConfig = {
+      ...config,
+      tests: {
+        ...config.tests,
+        directory: options.tests || config.tests.directory,
+      },
+    };
+
     let result;
     try {
       result = await backend.run(
@@ -222,7 +231,7 @@ export async function runCommand(options: RunOptions): Promise<void> {
           testFiles: discovery.files,
           shards,
         },
-        config
+        effectiveConfig
       );
     } catch (err: any) {
       logger.error(`Test execution failed: ${err.message}`);

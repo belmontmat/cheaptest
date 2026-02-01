@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  worker:
+    build: .
+    image: cheaptest-worker:latest
+    env_file:
+      - .env
+    volumes:
+      # Mount AWS credentials from host
+      - ~/.aws:/root/.aws:ro
+    environment:
+      - NODE_ENV=production
+      # Optional: Use specific AWS profile
+      # - AWS_PROFILE=default

@@ -253,6 +253,14 @@ credentials.json
 *.p12
 *.pfx
 
+# Environment files
+.env
+.env.*
+!.env.example
+*/.env
+*/.env.*
+!*/.env.example
+
 # Cost tracking data (optional - keep or remove based on preference)
 # cost-data/
 # .cost-history.json

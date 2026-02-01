@@ -76,9 +76,11 @@ export interface TestResult {
 
 export interface TestCase {
   name: string;
+  file: string;
   status: 'passed' | 'failed' | 'skipped';
   duration: number;
   error?: string;
+  stack?: string;
 }
 
 export interface RunSummary {
