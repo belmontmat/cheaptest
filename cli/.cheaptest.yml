@@ -1,21 +1,30 @@
 version: 1
+
 aws:
   region: us-east-1
-  cluster: cheaptest-cluster
-  taskDefinition: cheaptest-runner
-  subnets: []
-  securityGroups: []
+  cluster: cheaptest-dev
+  taskDefinition: cheaptest-dev-worker
+  subnets:
+    - subnet-0f4b86c6cfcb9a5eb
+    - subnet-046664f40a877bf18
+  securityGroups:
+    - sg-0596765eab3b4fa65
+
 tests:
   directory: ./examples/playwright
   pattern: "**/*.spec.ts"
   framework: playwright
+
 execution:
   cpu: 1024
   memory: 2048
-  timeout: 30
+  timeout: 300000
+
 storage:
-  bucket: cheaptest-storage
+  bucket: cheaptest-dev-storage-200180699902
   retentionDays: 30
+
 output:
   format: pretty
   verbose: false
+  showCostComparison: true
