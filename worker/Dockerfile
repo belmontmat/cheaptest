@@ -1,6 +1,20 @@
-FROM --platform=linux/amd64 node:20
+# Note: Build with --platform linux/amd64 for ECS Fargate
+FROM node:20
 
 WORKDIR /app
+
+# Install system dependencies for Cypress and browsers
+RUN apt-get update && apt-get install -y \
+    libgtk-3-0 \
+    libgbm-dev \
+    libnotify-dev \
+    libnss3 \
+    libxss1 \
+    libasound2 \
+    libxtst6 \
+    xauth \
+    xvfb \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy package files first
 COPY package*.json ./
@@ -12,8 +26,8 @@ RUN npm ci
 # Install Playwright with system dependencies
 RUN npx playwright install --with-deps chromium
 
-# Install Cypress
-RUN npx cypress install || echo "Cypress install failed, continuing..."
+# Install Cypress binary
+RUN npx cypress install
 
 # Copy source code
 COPY src ./src

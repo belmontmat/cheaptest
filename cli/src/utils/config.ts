@@ -1,8 +1,6 @@
 import fs from 'fs/promises';
-import path from 'path';
 import yaml from 'yaml';
 import { CheaptestConfig } from '../types';
-import chalk from 'chalk';
 
 export const DEFAULT_CONFIG: CheaptestConfig = {
   version: 1,
@@ -15,7 +13,7 @@ export const DEFAULT_CONFIG: CheaptestConfig = {
   },
   tests: {
     directory: './e2e',
-    pattern: '**/*.spec.ts',
+    pattern: '',  // Empty to use framework-specific defaults
     framework: 'playwright',
   },
   execution: {

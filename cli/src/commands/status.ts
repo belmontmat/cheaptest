@@ -4,7 +4,7 @@ interface StatusOptions {
   watch?: boolean;
 }
 
-export async function statusCommand(runId: string, options: StatusOptions): Promise<void> {
+export async function statusCommand(runId: string, _options: StatusOptions): Promise<void> {
   const logger = new Logger();
   
   if (!runId) {

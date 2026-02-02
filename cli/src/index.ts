@@ -23,6 +23,7 @@ program
   .option('-t, --tests <path>', 'Path to test directory', './e2e')
   .option('-p, --parallel <number>', 'Number of parallel workers', '10')
   .option('-b, --backend <type>', 'Backend to use (ecs|kubernetes)', 'ecs')
+  .option('-f, --framework <type>', 'Test framework (playwright|cypress|selenium)')
   .option('-c, --config <path>', 'Path to config file', '.cheaptest.yml')
   .option('-v, --verbose', 'Verbose output', false)
   .option('--dry-run', 'Show execution plan without running', false)

@@ -49,6 +49,7 @@ export interface RunOptions {
   tests: string;
   parallel: number;
   backend: BackendType;
+  framework?: TestFramework;
   config?: string;
   verbose?: boolean;
   dryRun?: boolean;

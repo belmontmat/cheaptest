@@ -43,16 +43,16 @@ async function main() {
     const s3Client = new S3ClientWrapper(config.region);
 
     // Download test code from S3
-    console.log('📦 Downloading test code...');
+    console.log('[INFO] Downloading test code...');
     const testCodeKey = `runs/${config.runId}/test-code.tar.gz`;
     const workspace = '/workspace';
     
     await s3Client.downloadAndExtract(config.bucket, testCodeKey, workspace);
-    console.log('✓ Test code downloaded and extracted');
+    console.log('[OK] Test code downloaded and extracted');
     console.log('');
 
     // Download shard configuration
-    console.log('📋 Downloading shard configuration...');
+    console.log('[INFO] Downloading shard configuration...');
     const shardsKey = `runs/${config.runId}/shards.json`;
     const shards = await s3Client.downloadJSON<any[]>(config.bucket, shardsKey);
     const shard = shards.find(s => s.id === config.shardId);
@@ -61,11 +61,11 @@ async function main() {
       throw new Error(`Shard ${config.shardId} not found in configuration`);
     }
 
-    console.log(`✓ Shard configuration loaded: ${shard.files.length} test files`);
+    console.log(`[OK] Shard configuration loaded: ${shard.files.length} test files`);
     console.log('');
 
     // Run tests
-    console.log('🧪 Running tests...');
+    console.log('[TEST] Running tests...');
     console.log('-'.repeat(60));
 
     const runner = new TestRunner({
@@ -83,7 +83,7 @@ async function main() {
     } catch (error: any) {
       // Capture error but continue to upload partial results
       runnerError = error;
-      console.error('❌ Test runner error:', error.message);
+      console.error('[ERROR] Test runner error:', error.message);
 
       // Create error result so we still upload something
       result = {
@@ -103,7 +103,7 @@ async function main() {
     }
 
     console.log('-'.repeat(60));
-    console.log(runnerError ? '⚠ Tests completed with errors' : '✓ Tests completed');
+    console.log(runnerError ? '[WARN] Tests completed with errors' : '[OK] Tests completed');
     console.log(`  Passed: ${result.passed}`);
     console.log(`  Failed: ${result.failed}`);
     console.log(`  Skipped: ${result.skipped}`);
@@ -111,7 +111,7 @@ async function main() {
     console.log('');
 
     // Upload results to S3 (even on failure)
-    console.log('📤 Uploading results...');
+    console.log('[INFO] Uploading results...');
     const resultsKey = `runs/${config.runId}/results/shard-${config.shardId}.json`;
 
     await s3Client.uploadJSON(config.bucket, resultsKey, result, {
@@ -122,7 +122,7 @@ async function main() {
       ...(runnerError && { error: runnerError.message }),
     });
 
-    console.log(`✓ Results uploaded to ${resultsKey}`);
+    console.log(`[OK] Results uploaded to ${resultsKey}`);
     console.log('');
 
     // Exit with appropriate code
@@ -136,7 +136,7 @@ async function main() {
 
   } catch (error) {
     console.error('');
-    console.error('❌ Worker failed:');
+    console.error('[ERROR] Worker failed:');
     console.error(error);
     console.error('');
     process.exit(1);

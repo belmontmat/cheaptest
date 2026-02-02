@@ -13,18 +13,32 @@ export class PlaywrightRunner {
   async execute(): Promise<TestCase[]> {
     console.log('Running Playwright tests...');
 
+    // Find the actual test root directory
+    // The tarball extracts with the parent directory name (e.g., /workspace/playwright/...)
+    const testRoot = await this.findTestRoot();
+    console.log(`  Test root directory: ${testRoot}`);
+
     // Create a temporary file list for this shard
     const testFiles = this.config.shard.files.map(f => f.relativePath);
-    const fileListPath = path.join(this.config.workspace, '.shard-files.txt');
+    const fileListPath = path.join(testRoot, '.shard-files.txt');
     await fs.writeFile(fileListPath, testFiles.join('\n'));
 
     // Create Playwright config for this shard (use .js to avoid TypeScript compilation)
     const playwrightConfig = this.createPlaywrightConfig(testFiles);
-    const configPath = path.join(this.config.workspace, 'playwright.shard.config.js');
+    const configPath = path.join(testRoot, 'playwright.shard.config.js');
     await fs.writeFile(configPath, playwrightConfig);
 
     // Run Playwright with JSON reporter
-    const resultsPath = path.join(this.config.workspace, 'playwright-results.json');
+    const resultsPath = path.join(testRoot, 'playwright-results.json');
+
+    // Symlink node_modules from /app if not present
+    const nodeModulesLink = path.join(testRoot, 'node_modules');
+    try {
+      await fs.access(nodeModulesLink);
+    } catch {
+      await fs.symlink('/app/node_modules', nodeModulesLink);
+      console.log('  Symlinked node_modules for dependencies');
+    }
 
     // Use the installed Playwright from /app/node_modules instead of npx
     const playwrightBin = '/app/node_modules/.bin/playwright';
@@ -40,7 +54,7 @@ export class PlaywrightRunner {
       console.log(`  Command: ${playwrightBin} ${args.join(' ')}`);
 
       const proc = spawn(playwrightBin, args, {
-        cwd: this.config.workspace,
+        cwd: testRoot,
         env: {
           ...process.env,
           PLAYWRIGHT_JSON_OUTPUT_NAME: resultsPath,
@@ -90,6 +104,26 @@ export class PlaywrightRunner {
         reject(new Error(`Failed to spawn Playwright: ${error.message}`));
       });
     });
+  }
+
+  /**
+   * Find the actual test root directory.
+   * The tarball extracts with the parent directory name (e.g., /workspace/playwright/...)
+   * so we need to find that subdirectory.
+   */
+  private async findTestRoot(): Promise<string> {
+    const entries = await fs.readdir(this.config.workspace, { withFileTypes: true });
+    const dirs = entries.filter(e => e.isDirectory() && !e.name.startsWith('.'));
+
+    // If there's exactly one directory, use it as the test root
+    if (dirs.length === 1) {
+      const subdir = path.join(this.config.workspace, dirs[0].name);
+      console.log(`  Found single subdirectory: ${dirs[0].name}`);
+      return subdir;
+    }
+
+    // Otherwise, use the workspace directly
+    return this.config.workspace;
   }
 
   private createPlaywrightConfig(testFiles: string[]): string {

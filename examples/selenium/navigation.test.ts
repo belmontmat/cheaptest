@@ -9,7 +9,7 @@ describe('Google Navigation', () => {
     options.addArguments('--headless');
     options.addArguments('--disable-gpu');
     options.addArguments('--no-sandbox');
-    
+
     driver = await new Builder()
       .forBrowser('chrome')
       .setChromeOptions(options)
@@ -22,6 +22,15 @@ describe('Google Navigation', () => {
 
   beforeEach(async () => {
     await driver.get('https://www.google.com');
+    // Handle cookie consent if present
+    try {
+      const acceptButton = await driver.findElement(By.xpath('//button[contains(text(), "Accept all")]'));
+      if (await acceptButton.isDisplayed()) {
+        await acceptButton.click();
+      }
+    } catch {
+      // No consent dialog, continue
+    }
   });
 
   it('should have correct page title', async () => {
@@ -30,26 +39,27 @@ describe('Google Navigation', () => {
   });
 
   it('should have Google logo', async () => {
-    const logo = await driver.findElement(By.css('img[alt*="Google"]'));
+    // Logo can have various alt text
+    const logo = await driver.findElement(By.css('img[alt*="Google"], img[alt*="google"]'));
     expect(await logo.isDisplayed()).toBe(true);
   });
 
   it('should have search input', async () => {
-    const searchInput = await driver.findElement(By.name('q'));
+    const searchInput = await driver.findElement(By.css('textarea[name="q"]'));
     expect(await searchInput.isDisplayed()).toBe(true);
   });
 
   it('should enable search input', async () => {
-    const searchInput = await driver.findElement(By.name('q'));
+    const searchInput = await driver.findElement(By.css('textarea[name="q"]'));
     expect(await searchInput.isEnabled()).toBe(true);
   });
 
   it('should clear search input', async () => {
-    const searchInput = await driver.findElement(By.name('q'));
-    
+    const searchInput = await driver.findElement(By.css('textarea[name="q"]'));
+
     await searchInput.sendKeys('test');
     await searchInput.clear();
-    
+
     const value = await searchInput.getAttribute('value');
     expect(value).toBe('');
   });

@@ -13,15 +13,32 @@ export class SeleniumRunner {
   async execute(): Promise<TestCase[]> {
     console.log('Running Selenium tests with Jest...');
 
+    // Find the actual test root directory
+    // The tarball extracts with the parent directory name (e.g., /workspace/selenium/...)
+    const testRoot = await this.findTestRoot();
+    console.log(`  Test root directory: ${testRoot}`);
+
     const testFiles = this.config.shard.files.map(f => f.relativePath);
 
     // Create Jest config for Selenium tests
     const jestConfig = await this.createJestConfig();
-    const configPath = path.join(this.config.workspace, 'jest.shard.config.js');
+    const configPath = path.join(testRoot, 'jest.shard.config.js');
     await fs.writeFile(configPath, jestConfig);
 
     // Run Jest with JSON reporter
-    const resultsPath = path.join(this.config.workspace, 'selenium-results.json');
+    const resultsPath = path.join(testRoot, 'selenium-results.json');
+
+    // Symlink node_modules from /app if not present
+    const nodeModulesLink = path.join(testRoot, 'node_modules');
+    try {
+      await fs.access(nodeModulesLink);
+    } catch {
+      await fs.symlink('/app/node_modules', nodeModulesLink);
+      console.log('  Symlinked node_modules for dependencies');
+    }
+
+    // Use the installed Jest from /app/node_modules instead of npx
+    const jestBin = '/app/node_modules/.bin/jest';
 
     return new Promise((resolve, reject) => {
       const args = [
@@ -33,10 +50,10 @@ export class SeleniumRunner {
         ...testFiles,
       ];
 
-      console.log(`  Command: npx jest ${args.join(' ')}`);
+      console.log(`  Command: ${jestBin} ${args.join(' ')}`);
 
-      const proc = spawn('npx', ['jest', ...args], {
-        cwd: this.config.workspace,
+      const proc = spawn(jestBin, args, {
+        cwd: testRoot,
         env: {
           ...process.env,
           NODE_ENV: 'test',
@@ -84,15 +101,35 @@ export class SeleniumRunner {
     });
   }
 
+  /**
+   * Find the actual test root directory.
+   * The tarball extracts with the parent directory name (e.g., /workspace/selenium/...)
+   * so we need to find that subdirectory.
+   */
+  private async findTestRoot(): Promise<string> {
+    const entries = await fs.readdir(this.config.workspace, { withFileTypes: true });
+    const dirs = entries.filter(e => e.isDirectory() && !e.name.startsWith('.'));
+
+    // If there's exactly one directory, use it as the test root
+    if (dirs.length === 1) {
+      const subdir = path.join(this.config.workspace, dirs[0].name);
+      console.log(`  Found single subdirectory: ${dirs[0].name}`);
+      return subdir;
+    }
+
+    // Otherwise, use the workspace directly
+    return this.config.workspace;
+  }
+
   private async createJestConfig(): Promise<string> {
+    // Use ts-jest from /app/node_modules to avoid needing it in workspace
     return `
 module.exports = {
-  preset: 'ts-jest',
   testEnvironment: 'node',
   testMatch: ['**/*.test.ts'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
   transform: {
-    '^.+\\.tsx?$': 'ts-jest',
+    '^.+\\.tsx?$': '/app/node_modules/ts-jest',
   },
   collectCoverage: false,
   verbose: true,

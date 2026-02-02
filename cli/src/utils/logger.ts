@@ -10,24 +10,24 @@ export class Logger {
   }
 
   info(message: string): void {
-    console.log(chalk.blue('ℹ'), message);
+    console.log(chalk.blue('[INFO]'), message);
   }
 
   success(message: string): void {
-    console.log(chalk.green('✓'), message);
+    console.log(chalk.green('[OK]'), message);
   }
 
   error(message: string): void {
-    console.error(chalk.red('✗'), message);
+    console.error(chalk.red('[ERROR]'), message);
   }
 
   warn(message: string): void {
-    console.warn(chalk.yellow('⚠'), message);
+    console.warn(chalk.yellow('[WARN]'), message);
   }
 
   debug(message: string): void {
     if (this.verbose) {
-      console.log(chalk.gray('→'), message);
+      console.log(chalk.gray('[DEBUG]'), message);
     }
   }
 

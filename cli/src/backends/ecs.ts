@@ -3,7 +3,6 @@ import {
   RunTaskCommand,
   DescribeTasksCommand,
   Task,
-  StopTaskCommand,
 } from '@aws-sdk/client-ecs';
 import { createS3Client } from '../aws/s3-client';
 import {
@@ -97,12 +96,12 @@ export class ECSBackend implements BackendInterface {
       this.logger.info('='.repeat(60));
       this.logger.info('Run Complete');
       this.logger.info('='.repeat(60));
-      this.logger.success(`✓ Passed: ${summary.passed}`);
+      this.logger.success(`Passed: ${summary.passed}`);
       if (summary.failed > 0) {
-        this.logger.error(`✗ Failed: ${summary.failed}`);
+        this.logger.error(`Failed: ${summary.failed}`);
       }
       if (summary.skipped > 0) {
-        this.logger.info(`⊘ Skipped: ${summary.skipped}`);
+        this.logger.info(`Skipped: ${summary.skipped}`);
       }
       this.logger.info(`Duration: ${(duration / 1000).toFixed(2)}s`);
       this.logger.info(`Estimated Cost: $${summary.cost.toFixed(4)}`);
@@ -115,11 +114,11 @@ export class ECSBackend implements BackendInterface {
     }
   }
 
-  async status(runId: string): Promise<RunStatus> {
+  async status(_runId: string): Promise<RunStatus> {
     throw new Error('Status not implemented yet');
   }
 
-  async cancel(runId: string): Promise<void> {
+  async cancel(_runId: string): Promise<void> {
     throw new Error('Cancel not implemented yet');
   }
 

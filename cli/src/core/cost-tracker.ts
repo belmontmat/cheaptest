@@ -120,7 +120,7 @@ export class CostTracker {
               entries.push(entry);
             }
           }
-        } catch (err) {
+        } catch {
           // Skip files that can't be parsed
           continue;
         }

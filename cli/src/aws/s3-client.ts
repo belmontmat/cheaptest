@@ -10,7 +10,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import fs from 'fs/promises';
-import { createReadStream, ReadStream } from 'fs';
+import { createReadStream } from 'fs';
 import { Readable } from 'stream';
 import path from 'path';
 import * as tar from 'tar';

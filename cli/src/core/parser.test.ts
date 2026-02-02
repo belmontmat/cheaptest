@@ -786,7 +786,7 @@ describe('TestParser with example files', () => {
       try {
         await fs.access(playwrightDir);
       } catch {
-        console.log('⏭️  Playwright examples not found, skipping test');
+        console.log('[SKIP]  Playwright examples not found, skipping test');
         return;
       }
 
@@ -801,7 +801,7 @@ describe('TestParser with example files', () => {
       expect(result.files.every(f => f.framework === 'playwright')).toBe(true);
       expect(result.files.every(f => f.estimatedDuration! > 0)).toBe(true);
       
-      console.log(`✅ Found ${result.totalFiles} Playwright test files`);
+      console.log(`[OK] Found ${result.totalFiles} Playwright test files`);
       result.files.forEach(f => {
         console.log(`   - ${f.relativePath} (~${(f.estimatedDuration! / 1000).toFixed(1)}s)`);
       });
@@ -813,7 +813,7 @@ describe('TestParser with example files', () => {
       try {
         await fs.access(playwrightDir);
       } catch {
-        console.log('⏭️  Playwright examples not found, skipping test');
+        console.log('[SKIP]  Playwright examples not found, skipping test');
         return;
       }
 
@@ -838,7 +838,7 @@ describe('TestParser with example files', () => {
       try {
         await fs.access(cypressDir);
       } catch {
-        console.log('⏭️  Cypress examples not found, skipping test');
+        console.log('[SKIP]  Cypress examples not found, skipping test');
         return;
       }
 
@@ -852,7 +852,7 @@ describe('TestParser with example files', () => {
       expect(result.totalFiles).toBeGreaterThan(0);
       expect(result.files.every(f => f.framework === 'cypress')).toBe(true);
       
-      console.log(`✅ Found ${result.totalFiles} Cypress test files`);
+      console.log(`[OK] Found ${result.totalFiles} Cypress test files`);
       result.files.forEach(f => {
         console.log(`   - ${f.relativePath} (~${(f.estimatedDuration! / 1000).toFixed(1)}s)`);
       });
@@ -864,7 +864,7 @@ describe('TestParser with example files', () => {
       try {
         await fs.access(cypressDir);
       } catch {
-        console.log('⏭️  Cypress examples not found, skipping test');
+        console.log('[SKIP]  Cypress examples not found, skipping test');
         return;
       }
 
@@ -877,7 +877,7 @@ describe('TestParser with example files', () => {
       const suites = parser.groupBySuite(result.files);
       expect(suites.has('e2e')).toBe(true);
       
-      console.log(`✅ Cypress tests grouped into ${suites.size} suites:`);
+      console.log(`[OK] Cypress tests grouped into ${suites.size} suites:`);
       suites.forEach((files, suite) => {
         console.log(`   ${suite}: ${files.length} files`);
       });
@@ -891,7 +891,7 @@ describe('TestParser with example files', () => {
       try {
         await fs.access(seleniumDir);
       } catch {
-        console.log('⏭️  Selenium examples not found, skipping test');
+        console.log('[SKIP]  Selenium examples not found, skipping test');
         return;
       }
 
@@ -905,7 +905,7 @@ describe('TestParser with example files', () => {
       expect(result.totalFiles).toBeGreaterThan(0);
       expect(result.files.every(f => f.framework === 'selenium')).toBe(true);
       
-      console.log(`✅ Found ${result.totalFiles} Selenium test files`);
+      console.log(`[OK] Found ${result.totalFiles} Selenium test files`);
       result.files.forEach(f => {
         console.log(`   - ${f.relativePath} (~${(f.estimatedDuration! / 1000).toFixed(1)}s)`);
       });
@@ -919,7 +919,7 @@ describe('TestParser with example files', () => {
         await fs.access(playwrightDir);
         await fs.access(seleniumDir);
         } catch {
-      console.log('⏭️  Examples not found, skipping test');
+      console.log('[SKIP]  Examples not found, skipping test');
       return;
       }
       
@@ -953,7 +953,7 @@ describe('TestParser with example files', () => {
       try {
         await fs.access(examplesDir);
       } catch {
-        console.log('⏭️  Examples directory not found, skipping test');
+        console.log('[SKIP]  Examples directory not found, skipping test');
         return;
       }
 
@@ -967,7 +967,7 @@ describe('TestParser with example files', () => {
         });
         results.push({ framework: 'Playwright', count: playwright.totalFiles });
       } catch {
-        console.log('⏭️  Playwright examples not found');
+        console.log('[SKIP]  Playwright examples not found');
       }
 
       try {
@@ -978,7 +978,7 @@ describe('TestParser with example files', () => {
         });
         results.push({ framework: 'Cypress', count: cypress.totalFiles });
       } catch {
-        console.log('⏭️  Cypress examples not found');
+        console.log('[SKIP]  Cypress examples not found');
       }
 
       try {
@@ -989,12 +989,12 @@ describe('TestParser with example files', () => {
         });
         results.push({ framework: 'Selenium', count: selenium.totalFiles });
       } catch {
-        console.log('⏭️  Selenium examples not found');
+        console.log('[SKIP]  Selenium examples not found');
       }
 
       expect(results.length).toBeGreaterThan(0);
       
-      console.log(`✅ Found tests in ${results.length} frameworks:`);
+      console.log(`[OK] Found tests in ${results.length} frameworks:`);
       results.forEach(r => {
         console.log(`   ${r.framework}: ${r.count} files`);
       });
@@ -1004,7 +1004,7 @@ describe('TestParser with example files', () => {
       try {
         await fs.access(examplesDir);
       } catch {
-        console.log('⏭️  Examples directory not found, skipping test');
+        console.log('[SKIP]  Examples directory not found, skipping test');
         return;
       }
 
@@ -1031,7 +1031,7 @@ describe('TestParser with example files', () => {
       }
 
       if (allFiles.length === 0) {
-        console.log('⏭️  No example files found, skipping test');
+        console.log('[SKIP]  No example files found, skipping test');
         return;
       }
 

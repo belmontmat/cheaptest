@@ -2,7 +2,7 @@
 
 set -e  # Exit on error
 
-echo "🔍 Extracting Terraform infrastructure values..."
+echo "[INFO] Extracting Terraform infrastructure values..."
 echo ""
 
 cd "$(dirname "$0")"  # Navigate to script directory
@@ -17,7 +17,7 @@ SUBNET_2=$(terraform state show 'aws_subnet.public[1]' | grep -w id | awk '{prin
 SG=$(terraform state show aws_security_group.ecs_tasks | grep -w id | awk '{print $3}' | tr -d '"')
 AWS_REGION="us-east-1"
 # Display extracted values
-echo "📋 Infrastructure Details:"
+echo "[INFO] Infrastructure Details:"
 echo "  ECR Repository:    $ECR_REPO"
 echo "  S3 Bucket:         $S3_BUCKET"
 echo "  ECS Cluster:       $ECS_CLUSTER"
@@ -31,14 +31,14 @@ echo ""
 # Validate all values are present
 if [ -z "$ECR_REPO" ] || [ -z "$S3_BUCKET" ] || [ -z "$ECS_CLUSTER" ] || \
    [ -z "$TASK_DEF" ] || [ -z "$SUBNET_1" ] || [ -z "$SUBNET_2" ] || [ -z "$SG" ]; then
-  echo "❌ Error: Failed to extract some values from Terraform state"
+  echo "[ERROR] Error: Failed to extract some values from Terraform state"
   exit 1
 fi
 
 # Create .cheaptest.yml in project root
 CONFIG_FILE="../cli/.cheaptest.yml"
 
-echo "📝 Generating $CONFIG_FILE..."
+echo "[INFO] Generating $CONFIG_FILE..."
 
 cat > "$CONFIG_FILE" << EOF
 version: 1
@@ -73,30 +73,30 @@ output:
   showCostComparison: true
 EOF
 
-echo "✅ Configuration file created!"
+echo "[OK] Configuration file created!"
 echo ""
-echo "📄 Contents of .cheaptest.yml:"
+echo "[INFO] Contents of .cheaptest.yml:"
 echo "----------------------------------------"
 cat "$CONFIG_FILE"
 echo "----------------------------------------"
 echo ""
 
 # Export ECR_REPO for next steps
-echo "💾 Saving values for Docker push..."
+echo "[INFO] Saving values for Docker push..."
 cat > .env.terraform << EOF
 export ECR_REPO=$ECR_REPO
 export S3_BUCKET=$S3_BUCKET
 export AWS_REGION=$AWS_REGION
 EOF
 
-echo "✅ Values saved to .env.terraform"
+echo "[OK] Values saved to .env.terraform"
 echo ""
-echo "📦 Next steps:"
+echo "[INFO] Next steps:"
 echo "  1. Build and push worker image:"
 echo "     source terraform/phase1-ecs/.env.terraform"
 echo "     cd worker"
 echo "     aws ecr get-login-password --region \$AWS_REGION | docker login --username AWS --password-stdin \$ECR_REPO"
-echo "     docker build -t cheaptest-worker:latest ."
+echo "     docker build --platform linux/amd64 -t cheaptest-worker:latest ."
 echo "     docker tag cheaptest-worker:latest \$ECR_REPO:latest"
 echo "     docker push \$ECR_REPO:latest"
 echo ""

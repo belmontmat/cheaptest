@@ -123,7 +123,7 @@ export async function costCommand(options: CostOptions): Promise<void> {
       logger.section('Detailed Breakdown', '');
       logger.info('');
       
-      displayBreakdownTable(entries, logger);
+      displayBreakdownTable(entries);
     }
     
     // ============================================
@@ -134,7 +134,7 @@ export async function costCommand(options: CostOptions): Promise<void> {
       logger.section('Recent Runs', `Last ${Math.min(entries.length, 10)}`);
       logger.info('');
       
-      displayRecentRunsTable(entries.slice(0, 10), logger);
+      displayRecentRunsTable(entries.slice(0, 10));
     }
     
     // ============================================
@@ -148,11 +148,11 @@ export async function costCommand(options: CostOptions): Promise<void> {
       const insights = generateInsights(entries, summary);
       insights.forEach(insight => {
         if (insight.type === 'warning') {
-          logger.warn(`  ⚠  ${insight.message}`);
+          logger.warn(`  [!] ${insight.message}`);
         } else if (insight.type === 'success') {
-          logger.success(`  ✓  ${insight.message}`);
+          logger.success(`  [OK] ${insight.message}`);
         } else {
-          logger.info(`  ℹ  ${insight.message}`);
+          logger.info(`  [i] ${insight.message}`);
         }
       });
     }
@@ -179,7 +179,7 @@ export async function costCommand(options: CostOptions): Promise<void> {
       logger.info('');
       logger.startSpinner(`Exporting to ${options.export}...`);
       
-      await exportCostData(entries, options.export, logger);
+      await exportCostData(entries, options.export);
       
       logger.succeedSpinner(`Exported to ${chalk.cyan(options.export)}`);
     }
@@ -202,7 +202,7 @@ export async function costCommand(options: CostOptions): Promise<void> {
 /**
  * Display breakdown table with all runs
  */
-function displayBreakdownTable(entries: CostEntry[], logger: Logger): void {
+function displayBreakdownTable(entries: CostEntry[]): void {
   const data = [
     ['Run ID', 'Date', 'Backend', 'Tests', 'Duration', 'Cost'],
     ...entries.map(entry => [
@@ -232,7 +232,7 @@ function displayBreakdownTable(entries: CostEntry[], logger: Logger): void {
 /**
  * Display recent runs in compact format
  */
-function displayRecentRunsTable(entries: CostEntry[], logger: Logger): void {
+function displayRecentRunsTable(entries: CostEntry[]): void {
   const data = [
     ['Date', 'Backend', 'Tests', 'Pass Rate', 'Cost'],
     ...entries.map(entry => {
@@ -397,8 +397,7 @@ function calculateGitHubActionsCost(entries: CostEntry[]): number {
  */
 async function exportCostData(
   entries: CostEntry[],
-  filepath: string,
-  logger: Logger
+  filepath: string
 ): Promise<void> {
   const fs = await import('fs/promises');
   const path = await import('path');

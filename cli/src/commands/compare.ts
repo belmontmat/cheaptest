@@ -5,7 +5,7 @@ interface CompareOptions {
   parallel: number;
 }
 
-export async function compareCommand(options: CompareOptions): Promise<void> {
+export async function compareCommand(_options: CompareOptions): Promise<void> {
   const logger = new Logger();
   
   logger.header('Backend Comparison');

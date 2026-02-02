@@ -1,12 +1,32 @@
 import path from 'path';
 import chalk from 'chalk';
 import { createShards } from '../core/sharding';
-import { RunOptions, CheaptestConfig } from '../types';
+import { RunOptions, TestFramework } from '../types';
 import { Logger } from '../utils/logger';
 import { loadConfig, validateConfig, findConfigFile } from '../utils/config';
 import { TestParser } from '../core/test-parser';
 import { ECSBackend } from '../backends/ecs';
 import { KubernetesBackend } from '../backends/kubernetes';
+
+/**
+ * Auto-detect test framework from directory path
+ * Looks for framework names in the path (e.g., "examples/playwright" -> "playwright")
+ */
+function detectFrameworkFromPath(testPath: string): TestFramework | null {
+  const normalizedPath = testPath.toLowerCase();
+
+  if (normalizedPath.includes('playwright')) {
+    return 'playwright';
+  }
+  if (normalizedPath.includes('selenium')) {
+    return 'selenium';
+  }
+  if (normalizedPath.includes('cypress')) {
+    return 'cypress';
+  }
+
+  return null;
+}
 
 export async function runCommand(options: RunOptions): Promise<void> {
   const logger = new Logger(options.verbose);
@@ -44,13 +64,35 @@ export async function runCommand(options: RunOptions): Promise<void> {
     logger.startSpinner('Discovering test files...');
     
     const parser = new TestParser();
-    
+
+    // Resolve framework: CLI flag > auto-detect from path > config
+    const testDirectory = options.tests || config.tests.directory;
+    const effectiveFramework: TestFramework =
+      options.framework ||
+      detectFrameworkFromPath(testDirectory) ||
+      config.tests.framework;
+
+    // If framework changed from config, use framework-specific default pattern
+    // (empty string tells TestParser to use framework defaults)
+    const effectivePattern =
+      effectiveFramework !== config.tests.framework ? '' : config.tests.pattern;
+
+    if (options.verbose) {
+      if (options.framework) {
+        logger.debug(`Framework: ${effectiveFramework} (from --framework flag)`);
+      } else if (detectFrameworkFromPath(testDirectory)) {
+        logger.debug(`Framework: ${effectiveFramework} (auto-detected from path)`);
+      } else {
+        logger.debug(`Framework: ${effectiveFramework} (from config)`);
+      }
+    }
+
     let discovery;
     try {
       discovery = await parser.discover({
-        directory: options.tests || config.tests.directory,
-        pattern: config.tests.pattern,
-        framework: config.tests.framework,
+        directory: testDirectory,
+        pattern: effectivePattern,
+        framework: effectiveFramework,
         includeEstimates: true, // Get duration estimates for better sharding
       });
     } catch (err: any) {
@@ -131,11 +173,11 @@ export async function runCommand(options: RunOptions): Promise<void> {
     logger.header('Execution Plan');
     logger.info('');
     
-    const testDir = path.resolve(process.cwd(), options.tests || config.tests.directory);
+    const testDir = path.resolve(process.cwd(), testDirectory);
     
     logger.info(`  Test Directory:  ${chalk.cyan(testDir)}`);
     logger.info(`  Test Files:      ${chalk.green(discovery.totalFiles)}`);
-    logger.info(`  Framework:       ${chalk.cyan(config.tests.framework)}`);
+    logger.info(`  Framework:       ${chalk.cyan(effectiveFramework)}`);
     logger.info(`  Backend:         ${chalk.cyan(options.backend)}`);
     logger.info(`  Parallelism:     ${chalk.yellow(options.parallel)} workers`);
     logger.info(`  Timeout:         ${options.timeout || config.execution.timeout} minutes`);
@@ -214,12 +256,13 @@ export async function runCommand(options: RunOptions): Promise<void> {
     }
 
     // Pass shards to backend
-    // Override config.tests.directory with CLI --tests argument if provided
+    // Override config.tests with CLI arguments
     const effectiveConfig = {
       ...config,
       tests: {
         ...config.tests,
-        directory: options.tests || config.tests.directory,
+        directory: testDirectory,
+        framework: effectiveFramework,
       },
     };
 
@@ -383,7 +426,7 @@ export async function runCommand(options: RunOptions): Promise<void> {
       logger.error('Test run completed with failures');
       process.exit(1);
     } else {
-      logger.success('All tests passed! 🎉');
+      logger.success('All tests passed!');
       process.exit(0);
     }
     

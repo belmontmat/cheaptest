@@ -32,10 +32,10 @@ export class TestParser {
       '**/test/**/*.js',
     ],
     cypress: [
-      '**/cypress/e2e/**/*.cy.ts',
-      '**/cypress/e2e/**/*.cy.js',
-      '**/cypress/integration/**/*.spec.ts',
-      '**/cypress/integration/**/*.spec.js',
+      '**/*.cy.ts',
+      '**/*.cy.js',
+      '**/e2e/**/*.cy.ts',
+      '**/e2e/**/*.cy.js',
     ],
     selenium: [
       '**/*.test.ts',
