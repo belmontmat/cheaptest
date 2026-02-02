@@ -1,11 +1,11 @@
 import { Builder, By, until, WebDriver } from 'selenium-webdriver';
-import chrome from 'selenium-webdriver/chrome';
+import { Options as ChromeOptions } from 'selenium-webdriver/chrome';
 
 describe('Google Search', () => {
   let driver: WebDriver;
 
   beforeAll(async () => {
-    const options = new chrome.Options();
+    const options = new ChromeOptions();
     options.addArguments('--headless');
     options.addArguments('--disable-gpu');
     options.addArguments('--no-sandbox');
