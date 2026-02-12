@@ -1,5 +1,6 @@
 import { S3Client, GetObjectCommand, PutObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { BackendType } from '../types';
+import { getErrorMessage } from '../utils/retry';
 
 export interface CostEntry {
   runId: string;
@@ -36,7 +37,7 @@ export class CostTracker {
     private bucket: string,
     region: string
   ) {
-    this.s3 = new S3Client({ region });
+    this.s3 = new S3Client({ region, maxAttempts: 3, retryMode: 'adaptive' });
   }
   
   /**
@@ -71,8 +72,8 @@ export class CostTracker {
       
       const body = await response.Body?.transformToString();
       return body ? JSON.parse(body) : null;
-    } catch (err: any) {
-      if (err.name === 'NoSuchKey') {
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'NoSuchKey') {
         return null;
       }
       throw err;
@@ -130,8 +131,8 @@ export class CostTracker {
       entries.sort((a, b) => b.timestamp - a.timestamp);
       
       return entries;
-    } catch (err: any) {
-      throw new Error(`Failed to load cost history: ${err.message}`);
+    } catch (err: unknown) {
+      throw new Error(`Failed to load cost history: ${getErrorMessage(err)}`);
     }
   }
   

@@ -27,9 +27,11 @@ test.describe('Google Navigation', () => {
   });
 
   test('should have a search button', async ({ page }) => {
-    // Google Search button - can be input or button
+    // Google Search button is hidden until the search box is focused
+    const searchInput = page.locator('textarea[name="q"]');
+    await searchInput.click();
     const searchButton = page.locator('input[value="Google Search"], button:has-text("Google Search")').first();
-    await expect(searchButton).toBeVisible();
+    await expect(searchButton).toBeVisible({ timeout: 5000 });
   });
 
   test('should allow typing in search box', async ({ page }) => {

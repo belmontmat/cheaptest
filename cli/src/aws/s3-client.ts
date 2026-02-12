@@ -14,6 +14,7 @@ import { createReadStream } from 'fs';
 import { Readable } from 'stream';
 import path from 'path';
 import * as tar from 'tar';
+import { getErrorMessage } from '../utils/retry';
 
 export interface S3UploadOptions {
   bucket: string;
@@ -46,7 +47,7 @@ export class S3ClientWrapper {
 
   constructor(region: string) {
     this.region = region;
-    this.client = new S3Client({ region });
+    this.client = new S3Client({ region, maxAttempts: 3, retryMode: 'adaptive' });
   }
 
   /**
@@ -55,8 +56,10 @@ export class S3ClientWrapper {
   async ensureBucketExists(bucket: string): Promise<void> {
     try {
       await this.client.send(new HeadBucketCommand({ Bucket: bucket }));
-    } catch (err: any) {
-      if (err.name === 'NotFound' || err.$metadata?.httpStatusCode === 404) {
+    } catch (err: unknown) {
+      const isNotFound = err instanceof Error &&
+        ('name' in err && (err.name === 'NotFound' || (err as any).$metadata?.httpStatusCode === 404));
+      if (isNotFound) {
         // Bucket doesn't exist, create it
         const createParams: any = { Bucket: bucket };
 
@@ -69,7 +72,7 @@ export class S3ClientWrapper {
 
         await this.client.send(new CreateBucketCommand(createParams));
       } else {
-        throw new Error(`Failed to check bucket: ${err.message}`);
+        throw new Error(`Failed to check bucket: ${getErrorMessage(err)}`);
       }
     }
   }
@@ -109,8 +112,8 @@ export class S3ClientWrapper {
       }
 
       return `s3://${bucket}/${key}`;
-    } catch (err: any) {
-      throw new Error(`Failed to upload to S3: ${err.message}`);
+    } catch (err: unknown) {
+      throw new Error(`Failed to upload to S3: ${getErrorMessage(err)}`);
     }
   }
 
@@ -147,11 +150,11 @@ export class S3ClientWrapper {
       }
 
       return buffer;
-    } catch (err: any) {
-      if (err.name === 'NoSuchKey') {
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'NoSuchKey') {
         throw new Error(`Object not found: s3://${bucket}/${key}`);
       }
-      throw new Error(`Failed to download from S3: ${err.message}`);
+      throw new Error(`Failed to download from S3: ${getErrorMessage(err)}`);
     }
   }
 
@@ -168,8 +171,8 @@ export class S3ClientWrapper {
           Key: key,
         })
       );
-    } catch (err: any) {
-      throw new Error(`Failed to delete from S3: ${err.message}`);
+    } catch (err: unknown) {
+      throw new Error(`Failed to delete from S3: ${getErrorMessage(err)}`);
     }
   }
 
@@ -189,8 +192,8 @@ export class S3ClientWrapper {
       );
 
       return (response.Contents || []).map((obj) => obj.Key!).filter(Boolean);
-    } catch (err: any) {
-      throw new Error(`Failed to list S3 objects: ${err.message}`);
+    } catch (err: unknown) {
+      throw new Error(`Failed to list S3 objects: ${getErrorMessage(err)}`);
     }
   }
 
@@ -206,11 +209,11 @@ export class S3ClientWrapper {
         })
       );
       return true;
-    } catch (err: any) {
-      if (err.name === 'NotFound' || err.name === 'NoSuchKey') {
+    } catch (err: unknown) {
+      if (err instanceof Error && (err.name === 'NotFound' || err.name === 'NoSuchKey')) {
         return false;
       }
-      throw new Error(`Failed to check S3 object existence: ${err.message}`);
+      throw new Error(`Failed to check S3 object existence: ${getErrorMessage(err)}`);
     }
   }
 
@@ -259,8 +262,8 @@ export class S3ClientWrapper {
       await fs.unlink(tarballPath);
 
       return result;
-    } catch (err: any) {
-      throw new Error(`Failed to upload directory: ${err.message}`);
+    } catch (err: unknown) {
+      throw new Error(`Failed to upload directory: ${getErrorMessage(err)}`);
     }
   }
 
@@ -285,8 +288,8 @@ export class S3ClientWrapper {
 
       // Clean up tarball
       await fs.unlink(tarballPath);
-    } catch (err: any) {
-      throw new Error(`Failed to download and extract: ${err.message}`);
+    } catch (err: unknown) {
+      throw new Error(`Failed to download and extract: ${getErrorMessage(err)}`);
     }
   }
 
@@ -333,8 +336,8 @@ export class S3ClientWrapper {
       );
 
       return response.Metadata || {};
-    } catch (err: any) {
-      throw new Error(`Failed to get metadata: ${err.message}`);
+    } catch (err: unknown) {
+      throw new Error(`Failed to get metadata: ${getErrorMessage(err)}`);
     }
   }
 
@@ -351,8 +354,8 @@ export class S3ClientWrapper {
       );
 
       return response.ContentLength || 0;
-    } catch (err: any) {
-      throw new Error(`Failed to get object size: ${err.message}`);
+    } catch (err: unknown) {
+      throw new Error(`Failed to get object size: ${getErrorMessage(err)}`);
     }
   }
 

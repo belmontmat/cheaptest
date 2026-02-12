@@ -172,11 +172,12 @@ export class TestParser {
       if (!stats.isDirectory()) {
         throw new Error(`${directory} is not a directory`);
       }
-    } catch (err: any) {
-      if (err.code === 'ENOENT') {
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'code' in err && (err as NodeJS.ErrnoException).code === 'ENOENT') {
         throw new Error(`Directory not found: ${directory}`);
       }
-      throw new Error(`Cannot access directory ${directory}: ${err.message}`);
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(`Cannot access directory ${directory}: ${message}`);
     }
   }
 

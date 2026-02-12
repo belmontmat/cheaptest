@@ -46,13 +46,14 @@ export async function loadConfig(configPath: string): Promise<CheaptestConfig> {
       storage: { ...DEFAULT_CONFIG.storage, ...config.storage },
       output: { ...DEFAULT_CONFIG.output, ...config.output },
     };
-  } catch (err: any) {
-    if (err.code === 'ENOENT') {
+  } catch (err: unknown) {
+    if (err && typeof err === 'object' && 'code' in err && (err as NodeJS.ErrnoException).code === 'ENOENT') {
       throw new Error(
         `Config file not found: ${configPath}\nRun 'cheaptest init' to create one.`
       );
     }
-    throw new Error(`Failed to load config: ${err.message}`);
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`Failed to load config: ${message}`);
   }
 }
 

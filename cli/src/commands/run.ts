@@ -7,6 +7,8 @@ import { loadConfig, validateConfig, findConfigFile } from '../utils/config';
 import { TestParser } from '../core/test-parser';
 import { ECSBackend } from '../backends/ecs';
 import { KubernetesBackend } from '../backends/kubernetes';
+import { getErrorMessage } from '../utils/retry';
+import { writeJunitXml } from '../output/junit';
 
 /**
  * Auto-detect test framework from directory path
@@ -95,9 +97,9 @@ export async function runCommand(options: RunOptions): Promise<void> {
         framework: effectiveFramework,
         includeEstimates: true, // Get duration estimates for better sharding
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.failSpinner('Test discovery failed');
-      logger.error(err.message);
+      logger.error(getErrorMessage(err));
       logger.info('');
       logger.info('Make sure your test directory exists and contains test files');
       logger.info(`Looking in: ${chalk.cyan(options.tests || config.tests.directory)}`);
@@ -224,7 +226,19 @@ export async function runCommand(options: RunOptions): Promise<void> {
       : new ECSBackend(logger);
     
     logger.succeedSpinner(`${options.backend} backend ready`);
-    
+
+    // Graceful shutdown: cancel ECS tasks on Ctrl+C
+    if (backend instanceof ECSBackend) {
+      process.on('SIGINT', async () => {
+        logger.info('');
+        logger.warn('Interrupt received, cancelling tasks...');
+        if (backend.lastRunId) {
+          try { await backend.cancel(backend.lastRunId); } catch { /* best effort */ }
+        }
+        process.exit(130);
+      });
+    }
+
     // ============================================
     // 8. EXECUTE TESTS
     // ============================================
@@ -276,10 +290,10 @@ export async function runCommand(options: RunOptions): Promise<void> {
         },
         effectiveConfig
       );
-    } catch (err: any) {
-      logger.error(`Test execution failed: ${err.message}`);
-      
-      if (options.verbose && err.stack) {
+    } catch (err: unknown) {
+      logger.error(`Test execution failed: ${getErrorMessage(err)}`);
+
+      if (options.verbose && err instanceof Error && err.stack) {
         logger.info('');
         logger.debug('Stack trace:');
         logger.debug(err.stack);
@@ -417,6 +431,18 @@ export async function runCommand(options: RunOptions): Promise<void> {
       logger.info(`  • Retry only failed tests: ${chalk.cyan(`cheaptest run --tests ./e2e --only-failed ${result.runId}`)}`);
     }
 
+    // ============================================
+    // 12b. JUNIT XML EXPORT
+    // ============================================
+    if (options.junit) {
+      try {
+        const junitPath = await writeJunitXml(result, options.junit);
+        logger.success(`JUnit XML report written to ${chalk.cyan(junitPath)}`);
+      } catch (err: unknown) {
+        logger.warn(`Failed to write JUnit XML: ${getErrorMessage(err)}`);
+      }
+    }
+
     logger.info('');
 
     // ============================================
@@ -430,11 +456,11 @@ export async function runCommand(options: RunOptions): Promise<void> {
       process.exit(0);
     }
     
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.stopSpinner();
-    logger.error(`Unexpected error: ${err.message}`);
-    
-    if (options.verbose && err.stack) {
+    logger.error(`Unexpected error: ${getErrorMessage(err)}`);
+
+    if (options.verbose && err instanceof Error && err.stack) {
       logger.info('');
       logger.debug('Stack trace:');
       logger.debug(err.stack);

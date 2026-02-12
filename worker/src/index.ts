@@ -80,10 +80,10 @@ async function main() {
 
     try {
       result = await runner.run();
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Capture error but continue to upload partial results
-      runnerError = error;
-      console.error('[ERROR] Test runner error:', error.message);
+      runnerError = error instanceof Error ? error : new Error(String(error));
+      console.error('[ERROR] Test runner error:', runnerError.message);
 
       // Create error result so we still upload something
       result = {
@@ -97,7 +97,7 @@ async function main() {
           file: f.relativePath,
           status: 'failed' as const,
           duration: 0,
-          error: `Test runner crashed: ${error.message}`,
+          error: `Test runner crashed: ${runnerError!.message}`,
         })),
       };
     }

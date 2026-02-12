@@ -8,11 +8,16 @@ import path from 'path';
 import * as tar from 'tar';
 import { Readable } from 'stream';
 
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
 export class S3ClientWrapper {
   private client: S3Client;
 
   constructor(region: string) {
-    this.client = new S3Client({ region });
+    this.client = new S3Client({ region, maxAttempts: 3, retryMode: 'adaptive' });
   }
 
   async downloadAndExtract(
@@ -52,8 +57,8 @@ export class S3ClientWrapper {
 
       // Clean up tarball
       await fs.unlink(tarballPath);
-    } catch (err: any) {
-      throw new Error(`Failed to download and extract: ${err.message}`);
+    } catch (err: unknown) {
+      throw new Error(`Failed to download and extract: ${getErrorMessage(err)}`);
     }
   }
 
@@ -77,8 +82,8 @@ export class S3ClientWrapper {
       const buffer = Buffer.concat(chunks);
 
       return JSON.parse(buffer.toString('utf-8'));
-    } catch (err: any) {
-      throw new Error(`Failed to download JSON: ${err.message}`);
+    } catch (err: unknown) {
+      throw new Error(`Failed to download JSON: ${getErrorMessage(err)}`);
     }
   }
 
@@ -100,8 +105,8 @@ export class S3ClientWrapper {
           Metadata: metadata,
         })
       );
-    } catch (err: any) {
-      throw new Error(`Failed to upload JSON: ${err.message}`);
+    } catch (err: unknown) {
+      throw new Error(`Failed to upload JSON: ${getErrorMessage(err)}`);
     }
   }
 }

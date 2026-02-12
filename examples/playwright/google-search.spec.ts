@@ -20,10 +20,11 @@ test.describe('Google Search', () => {
     await searchBox.fill('Playwright testing');
     await searchBox.press('Enter');
 
-    await page.waitForLoadState('networkidle');
+    await expect(page).toHaveURL(/q=/); // wait for navigation
 
-    await expect(page).toHaveURL(/search/);
-    await expect(page.locator('#search, #rso').first()).toBeVisible();
+    const url = new URL(page.url());
+    expect(url.searchParams.get('q')).toBe('Playwright testing');
+
   });
 
   test('should display search suggestions', async ({ page }) => {

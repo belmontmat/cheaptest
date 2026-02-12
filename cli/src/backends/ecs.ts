@@ -2,6 +2,7 @@ import {
   ECSClient,
   RunTaskCommand,
   DescribeTasksCommand,
+  StopTaskCommand,
   Task,
 } from '@aws-sdk/client-ecs';
 import { createS3Client } from '../aws/s3-client';
@@ -14,25 +15,40 @@ import {
   TestResult,
 } from '../types';
 import { Logger } from '../utils/logger';
+import { withRetry, getErrorMessage } from '../utils/retry';
 
 export class ECSBackend implements BackendInterface {
   private ecsClient: ECSClient;
   private s3Client: ReturnType<typeof createS3Client>;
   private logger: Logger;
+  lastRunId: string | null = null;
 
   constructor(logger: Logger, region?: string) {
     this.logger = logger;
     // Get region from config, will be passed in run() method
-    this.ecsClient = new ECSClient({ region: region || 'us-east-1' });
+    this.ecsClient = new ECSClient({ region: region || 'us-east-1', maxAttempts: 3, retryMode: 'adaptive' });
     this.s3Client = createS3Client(region || 'us-east-1');
   }
 
   async run(options: RunOptions, config: CheaptestConfig): Promise<RunSummary> {
+    // Validate config before making any AWS calls
+    if (!config.aws.subnets?.length) {
+      throw new Error('No subnets configured. Add aws.subnets to your .cheaptest.yml');
+    }
+    if (!config.aws.securityGroups?.length) {
+      throw new Error('No security groups configured. Add aws.securityGroups to your .cheaptest.yml');
+    }
+    if (!config.aws.taskDefinition) {
+      throw new Error('No task definition configured. Add aws.taskDefinition to your .cheaptest.yml');
+    }
+
     // Update clients with correct region from config
-    this.ecsClient = new ECSClient({ region: config.aws.region });
+    this.ecsClient = new ECSClient({ region: config.aws.region, maxAttempts: 3, retryMode: 'adaptive' });
     this.s3Client = createS3Client(config.aws.region);
+    this.config = config;
 
     const runId = `run-${Date.now()}`;
+    this.lastRunId = runId;
     const startTime = new Date();
 
     this.logger.info('');
@@ -47,8 +63,8 @@ export class ECSBackend implements BackendInterface {
       try {
         await this.s3Client.ensureBucketExists(config.storage.bucket);
         this.logger.succeedSpinner(`S3 bucket ready: ${config.storage.bucket}`);
-      } catch (error: any) {
-        this.logger.failSpinner(`Failed to access/create bucket: ${error.message}`);
+      } catch (error: unknown) {
+        this.logger.failSpinner(`Failed to access/create bucket: ${getErrorMessage(error)}`);
         throw error;
       }
 
@@ -90,6 +106,7 @@ export class ECSBackend implements BackendInterface {
         cost: this.estimateCost(duration, options.shards!.length, config),
         startTime,
         endTime,
+        results,
       };
 
       this.logger.info('');
@@ -118,9 +135,32 @@ export class ECSBackend implements BackendInterface {
     throw new Error('Status not implemented yet');
   }
 
-  async cancel(_runId: string): Promise<void> {
-    throw new Error('Cancel not implemented yet');
+  async cancel(runId: string): Promise<void> {
+    const config = this.config;
+    if (!config) {
+      throw new Error('Backend not initialized. Call run() or setConfig() first.');
+    }
+
+    // Load task ARNs from S3
+    const tasksData = await this.s3Client.downloadJSON<{
+      taskArns: string[];
+      cluster: string;
+    }>(config.storage.bucket, `runs/${runId}/tasks.json`);
+
+    for (const taskArn of tasksData.taskArns) {
+      try {
+        await this.ecsClient.send(new StopTaskCommand({
+          cluster: tasksData.cluster,
+          task: taskArn,
+          reason: 'Cancelled by cheaptest',
+        }));
+      } catch {
+        // Task may already be stopped
+      }
+    }
   }
+
+  private config: CheaptestConfig | null = null;
 
   private async uploadTestCode(
     directory: string,
@@ -141,8 +181,8 @@ export class ECSBackend implements BackendInterface {
       this.logger.succeedSpinner(
         `Test code uploaded to s3://${config.storage.bucket}/${testCodeKey}`
       );
-    } catch (error: any) {
-      this.logger.failSpinner(`Failed to upload test code: ${error.message}`);
+    } catch (error: unknown) {
+      this.logger.failSpinner(`Failed to upload test code: ${getErrorMessage(error)}`);
       throw error;
     }
   }
@@ -172,8 +212,8 @@ export class ECSBackend implements BackendInterface {
       this.logger.succeedSpinner(
         `Shard configuration uploaded (${shards.length} shards)`
       );
-    } catch (error: any) {
-      this.logger.failSpinner(`Failed to upload shards: ${error.message}`);
+    } catch (error: unknown) {
+      this.logger.failSpinner(`Failed to upload shards: ${getErrorMessage(error)}`);
       throw error;
     }
   }
@@ -243,9 +283,30 @@ export class ECSBackend implements BackendInterface {
       }
 
       this.logger.succeedSpinner(`${taskArns.length} ECS tasks created`);
+
+      // Persist task ARNs to S3 for the status command
+      try {
+        const tasksKey = `runs/${runId}/tasks.json`;
+        await this.s3Client.uploadJSON(
+          config.storage.bucket,
+          tasksKey,
+          {
+            taskArns,
+            cluster: config.aws.cluster,
+            region: config.aws.region,
+            createdAt: new Date().toISOString(),
+          }
+        );
+      } catch (err: unknown) {
+        // Non-fatal: status command will fall back to S3-only mode
+        if (config.output.verbose) {
+          this.logger.debug(`Warning: could not persist task ARNs: ${getErrorMessage(err)}`);
+        }
+      }
+
       return taskArns;
-    } catch (error: any) {
-      this.logger.failSpinner(`Failed to create ECS tasks: ${error.message}`);
+    } catch (error: unknown) {
+      this.logger.failSpinner(`Failed to create ECS tasks: ${getErrorMessage(error)}`);
       throw error;
     }
   }
@@ -267,7 +328,19 @@ export class ECSBackend implements BackendInterface {
 
       if (elapsed > timeout) {
         this.logger.failSpinner('Tasks timed out');
-        throw new Error('Tasks exceeded timeout');
+        // Stop orphaned tasks to prevent cost leakage
+        for (const taskArn of taskArns) {
+          try {
+            await this.ecsClient.send(new StopTaskCommand({
+              cluster: config.aws.cluster,
+              task: taskArn,
+              reason: 'Timed out by cheaptest CLI',
+            }));
+          } catch {
+            // Task may already be stopped
+          }
+        }
+        throw new Error('Tasks exceeded timeout. Running tasks have been stopped.');
       }
 
       const response = await this.ecsClient.send(
@@ -334,44 +407,34 @@ export class ECSBackend implements BackendInterface {
     // Wait briefly for S3 eventual consistency after tasks stop
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    const maxRetries = 5;
-    const baseDelayMs = 1000;
-
     try {
       const results: TestResult[] = [];
       const failedShards: number[] = [];
 
       for (let i = 0; i < shardCount; i++) {
         const resultKey = `runs/${runId}/results/shard-${i}.json`;
-        let result: TestResult | null = null;
 
-        // Retry with exponential backoff
-        for (let attempt = 0; attempt < maxRetries; attempt++) {
-          try {
-            result = await this.s3Client.downloadJSON<TestResult>(
-              config.storage.bucket,
-              resultKey
-            );
-            break; // Success, exit retry loop
-          } catch (error: any) {
-            if (attempt < maxRetries - 1) {
-              const delay = baseDelayMs * Math.pow(2, attempt);
-              if (config.output.verbose) {
-                this.logger.debug(`  Shard ${i} not ready, retrying in ${delay}ms...`);
-              }
-              await new Promise(resolve => setTimeout(resolve, delay));
-            } else {
-              this.logger.warn(`  Failed to download results for shard ${i} after ${maxRetries} attempts`);
-              if (config.output.verbose) {
-                this.logger.debug(`  Error: ${error.message}`);
-              }
-              failedShards.push(i);
-            }
-          }
-        }
-
-        if (result) {
+        try {
+          const result = await withRetry(
+            () => this.s3Client.downloadJSON<TestResult>(config.storage.bucket, resultKey),
+            {
+              maxAttempts: 5,
+              baseDelayMs: 1000,
+              maxDelayMs: 15000,
+              onRetry: (attempt) => {
+                if (config.output.verbose) {
+                  this.logger.debug(`  Shard ${i} not ready, retry ${attempt}...`);
+                }
+              },
+            },
+          );
           results.push(result);
+        } catch (err: unknown) {
+          this.logger.warn(`  Failed to download results for shard ${i} after retries`);
+          if (config.output.verbose) {
+            this.logger.debug(`  Error: ${getErrorMessage(err)}`);
+          }
+          failedShards.push(i);
         }
 
         this.logger.updateSpinner(`Aggregating results from S3... (${results.length}/${shardCount})`);
@@ -385,8 +448,8 @@ export class ECSBackend implements BackendInterface {
       }
 
       return results;
-    } catch (error: any) {
-      this.logger.failSpinner(`Failed to aggregate results: ${error.message}`);
+    } catch (error: unknown) {
+      this.logger.failSpinner(`Failed to aggregate results: ${getErrorMessage(error)}`);
       throw error;
     }
   }

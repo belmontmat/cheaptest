@@ -141,17 +141,19 @@ export class CypressRunner {
         reject(new Error(`Cypress spec ${specFile} timed out`));
       }, this.config.timeout);
 
-      proc.on('close', async (code) => {
+      proc.on('close', (code) => {
         clearTimeout(timeout);
 
-        try {
-          const results = await this.parseResults(resultsPath, specFile);
-          resolve(results);
-        } catch (error) {
-          console.error(`Failed to parse results for ${specFile}:`, error);
-          const fallbackResults = this.parseFallbackResults(stdout, stderr, specFile);
-          resolve(fallbackResults);
-        }
+        (async () => {
+          try {
+            const results = await this.parseResults(resultsPath, specFile);
+            resolve(results);
+          } catch (error) {
+            console.error(`Failed to parse results for ${specFile}:`, error);
+            const fallbackResults = this.parseFallbackResults(stdout, stderr, specFile);
+            resolve(fallbackResults);
+          }
+        })().catch(reject);
       });
 
       proc.on('error', (error) => {

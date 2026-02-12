@@ -81,17 +81,19 @@ export class SeleniumRunner {
         reject(new Error(`Selenium tests timed out after ${this.config.timeout}ms`));
       }, this.config.timeout);
 
-      proc.on('close', async (code) => {
+      proc.on('close', (code) => {
         clearTimeout(timeout);
 
-        try {
-          const results = await this.parseResults(resultsPath);
-          resolve(results);
-        } catch (error) {
-          console.error('Failed to parse results:', error);
-          const fallbackResults = this.parseFallbackResults(stdout, stderr, testFiles);
-          resolve(fallbackResults);
-        }
+        (async () => {
+          try {
+            const results = await this.parseResults(resultsPath);
+            resolve(results);
+          } catch (error) {
+            console.error('Failed to parse results:', error);
+            const fallbackResults = this.parseFallbackResults(stdout, stderr, testFiles);
+            resolve(fallbackResults);
+          }
+        })().catch(reject);
       });
 
       proc.on('error', (error) => {

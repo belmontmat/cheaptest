@@ -57,6 +57,7 @@ export interface RunOptions {
   retries?: number;
   testFiles?: TestFile[];
   shards?: TestShard[];
+  junit?: string;
 }
 
 export interface TestShard {
@@ -95,6 +96,7 @@ export interface RunSummary {
   cost: number;
   startTime: Date;
   endTime: Date;
+  results?: TestResult[];
 }
 
 export interface BackendInterface {

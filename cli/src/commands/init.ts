@@ -45,8 +45,9 @@ export async function initCommand(options: InitOptions): Promise<void> {
     logger.info('  3. Run your first test:');
     logger.info(`     ${chalk.cyan('cheaptest run --tests ./e2e --parallel 10')}`);
     
-  } catch (err: any) {
-    logger.error(`Failed to initialize: ${err.message}`);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.error(`Failed to initialize: ${message}`);
     process.exit(1);
   }
 }

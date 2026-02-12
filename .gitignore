@@ -173,6 +173,7 @@ cheaptest.yaml
 # Test results
 test-results/
 junit.xml
+*.html
 playwright-report/
 cypress/videos/
 cypress/screenshots/

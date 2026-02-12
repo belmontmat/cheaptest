@@ -84,19 +84,21 @@ export class PlaywrightRunner {
         reject(new Error(`Playwright tests timed out after ${this.config.timeout}ms`));
       }, this.config.timeout);
 
-      proc.on('close', async (code) => {
+      proc.on('close', (code) => {
         clearTimeout(timeout);
 
-        try {
-          // Parse Playwright JSON results
-          const results = await this.parseResults(resultsPath);
-          resolve(results);
-        } catch (error) {
-          // If parsing fails, try to extract info from stdout/stderr
-          console.error('Failed to parse results:', error);
-          const fallbackResults = this.parseFallbackResults(stdout, stderr, testFiles);
-          resolve(fallbackResults);
-        }
+        (async () => {
+          try {
+            // Parse Playwright JSON results
+            const results = await this.parseResults(resultsPath);
+            resolve(results);
+          } catch (error) {
+            // If parsing fails, try to extract info from stdout/stderr
+            console.error('Failed to parse results:', error);
+            const fallbackResults = this.parseFallbackResults(stdout, stderr, testFiles);
+            resolve(fallbackResults);
+          }
+        })().catch(reject);
       });
 
       proc.on('error', (error) => {

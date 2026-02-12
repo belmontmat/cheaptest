@@ -7,6 +7,7 @@ import { initCommand } from './commands/init';
 import { statusCommand } from './commands/status';
 import { costCommand } from './commands/cost';
 import { compareCommand } from './commands/compare';
+import { cancelCommand } from './commands/cancel';
 import { version } from '../package.json';
 
 const program = new Command();
@@ -29,6 +30,7 @@ program
   .option('--dry-run', 'Show execution plan without running', false)
   .option('--timeout <minutes>', 'Test timeout in minutes', '30')
   .option('--retries <number>', 'Number of retries for failed tests', '0')
+  .option('--junit <path>', 'Write JUnit XML report to file')
   .action(runCommand);
 
 // Initialize configuration
@@ -56,6 +58,13 @@ program
   .option('--breakdown', 'Show detailed cost breakdown', false)
   .action(costCommand);
 
+// Cancel a run
+program
+  .command('cancel <runId>')
+  .description('Cancel a running test run by stopping all ECS tasks')
+  .option('--force', 'Skip confirmation and stop tasks immediately', false)
+  .action(cancelCommand);
+
 // Compare backends
 program
   .command('compare-backends')
@@ -69,11 +78,12 @@ program.exitOverride();
 
 try {
   program.parse(process.argv);
-} catch (err: any) {
-  if (err.code === 'commander.helpDisplayed') {
+} catch (err: unknown) {
+  if (err && typeof err === 'object' && 'code' in err && (err as any).code === 'commander.helpDisplayed') {
     process.exit(0);
   }
-  console.error(chalk.red('Error:'), err.message);
+  const message = err instanceof Error ? err.message : String(err);
+  console.error(chalk.red('Error:'), message);
   process.exit(1);
 }
 

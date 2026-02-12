@@ -193,8 +193,9 @@ export async function costCommand(options: CostOptions): Promise<void> {
     logger.info(`  • Run ${chalk.cyan('cheaptest cost --last-7-days')} for weekly costs`);
     logger.info(`  • Run ${chalk.cyan('cheaptest cost --export costs.csv')} to export data`);
     
-  } catch (err: any) {
-    logger.error(`Failed to load cost data: ${err.message}`);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.error(`Failed to load cost data: ${message}`);
     process.exit(1);
   }
 }
